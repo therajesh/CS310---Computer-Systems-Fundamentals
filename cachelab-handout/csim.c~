@@ -1,0 +1,151 @@
+/*Rajesh Narayan
+  narayar@whitman.edu*/
+
+#define _GNU_SOURCE
+#include "cachelab.h"
+#include <unistd.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <getopt.h>
+#include <string.h>
+
+int VERBOSE;
+
+/* represents a single cache line.
+   if this were more than a simulator, it would 
+   also hold actual data in addition to tag field 
+   and valid bit. */
+typedef struct {
+    long tag;
+    int valid;
+} cache_line;
+
+/* The struct that represents all of cache */
+typedef struct {
+    /* 2d array of cache lines. Each set will be an array of lines */
+    cache_line** set_array;
+    int set;    // set_bits
+    int lines;  // lines_per_set
+    int block;  // block_bits
+} cache_struct;
+
+
+/* creates a cache_struct object and returns a pointer 
+to that object */
+cache_struct* create_cache(int s, int E, int b) {
+    // malloc for cache_struct
+    cache_struct* cs = malloc(sizeof(cache_struct));
+    
+    cs->set = s;
+    cs->lines = E;
+    cs->block = b;
+
+    int total_sets = 1 << s;
+    // malloc for cache_struct's set array:
+    cs->set_array = malloc(sizeof(cache_line*) * total_sets);
+
+    // malloc enough space for each set
+    for(int i = 0; i < total_sets; i++) {
+        // each set is E lines
+        cs->set_array[i] = malloc(sizeof(cache_line) * E);
+        for(int j = 0; j < E; j++) {
+            // set the valid bit to 0 in each line
+            cs->set_array[i][j].valid = 0;
+        }
+    }
+
+    return cs;
+}
+
+void cache_access(cache_struct* cache, long addr, int bytesread, char* acctype) {
+    
+}
+
+/* Prints a message about how to use the program */
+void usage() {
+    fprintf(stderr, 
+        "Usage: csim -s <s> -E <E> -b <b> -t <tracefile> [-v]\n");
+    exit(0);
+}
+
+int main(int argc, char* argv[])
+{
+    /* This first section is for parsing command line
+       arguments. You should be able to leave it intact */
+    int opt;
+    int bval = 2; // default 2 block bits (block size of 4)
+    int sval = 3; // default 3 set bits (8 sets)
+    int Eval = 1; // default 1 line per set
+    char* tracefile = NULL;
+    VERBOSE = 0; // default not verbose
+    while( (opt = getopt(argc, argv, "s:E:b:t:vh")) != -1) {
+        switch(opt) {
+            case 'b':
+                bval = atoi(optarg);
+                break;
+            case 's':
+                sval = atoi(optarg);
+                break;
+            case 'E':
+                Eval = atoi(optarg);
+                break;
+            case 't':
+                tracefile = malloc(strlen(optarg) + 1);
+                strncpy(tracefile, optarg, strlen(optarg)+1);
+                break;
+            case 'v':
+                VERBOSE = 1;
+                break;
+            case 'h':
+                usage();
+        }
+    }
+    if(tracefile == NULL) {
+        usage();
+    }
+    if(VERBOSE) {
+        printf("s: %d b: %d E: %d t: %s\n", sval, bval, Eval, tracefile);
+    }
+    /* End of command-line argument parsing code */
+    
+    // read tracefile line by line
+    
+    /* Begin your code to simulate your cache here */
+
+    cache_struct* cache = create_cache(sval, Eval, bval); // creating a cache object
+    // set_bits, lines_per_set, and block_bits
+    cache->block = bval;
+    cache->set = sval;    // setting the values for the cache to be
+    cache->lines = Eval;  // equal to the inputted values
+    
+    int miss_count = 0, hit_count = 0, eviction_count = 0;
+    
+    FILE *fp = fopen(tracefile, "r");
+    if (fp ==NULL) {
+        printf("Couldn't read file\n");
+    } else {
+        //read line by line using getline
+        char * line;
+        size_t len = 0;
+        ssize_t read;
+        while ((read = getline(&line, &len, fp)) != -1) {
+            printf("Retrieved line of length %zu :\n", read);
+            printf("%s", line);
+            
+            // parse line into accesstype, address, bytesread
+            long addr, bytesread;
+            char acctype[6];
+            sscanf(line, "%s %lx,%ld", acctype, &addr, &bytesread);
+            
+            printf("access type: %s, memory addr: %lx, Bytes read: %ld\n", acctype, addr, bytesread);
+            
+            // call cache access function
+            cache_access(cache, addr, bytesread, acctype);
+        }
+    }
+
+    
+    printSummary(hit_count, miss_count, eviction_count);
+
+    return 0;
+}
